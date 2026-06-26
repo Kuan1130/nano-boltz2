@@ -1,12 +1,12 @@
 # 0. Operator Dictionary
 
--   `L(x)`: Linear **WITH bias** $\rightarrow xW + b$
+-   `L(x)`: Linear **WITH bias** <img src="https://githubusercontent.com" valign="middle">
 
--   `L_hat(x)`: Linear **NO bias** $\rightarrow xW$
+-   `L_hat(x)`: Linear **NO bias** <img src="https://githubusercontent.com" valign="middle">
 
 -   `LN(x)`: LayerNorm
 
--   `Sig(x)`: Sigmoid $\rightarrow \sigma(x)$
+-   `Sig(x)`: Sigmoid <img src="https://githubusercontent.com" valign="middle">
 
 -   `Sftm(x, dim)`: Softmax
 
@@ -16,13 +16,13 @@
 
 -   `SinPE(x)`: Sinusoidal Positional Encoding
 
--   $\odot$: Element-wise multiplication
+-   <img src="https://githubusercontent.com" valign="middle">: Element-wise multiplication
 
 # 1. Feature Initialization + Atom Attention (3 Layers)
 
--   **Inputs**: Atom Feature ($F_A \in \mathbb{R}^{M \times d_0}$), Bond Feature ($F_b \in \mathbb{R}^{M \times M \times d_0}$), Token Mapping ($\tau (i) = u$)
+-   **Inputs**: Atom Feature (<img src="https://githubusercontent.com" valign="middle">), Bond Feature (<img src="https://githubusercontent.com" valign="middle">), Token Mapping (<img src="https://githubusercontent.com" valign="middle">)
 
--   **Outputs**: $S_i$, $Z_{ij}$
+-   **Outputs**: <img src="https://githubusercontent.com" valign="middle">, <img src="https://githubusercontent.com" valign="middle">
 
 ## 1.1 Embedding Initialization
 
@@ -37,9 +37,9 @@ p_{ij} &= \text{Emb}_{pos}(F_{B, ij}) \\ 
 
 $$
 
-## 1.2 *Token-to-Atom Broadcast (Only in AF3, not in Boltz)*
+## 1.2 *Token-to-Atom Broadcast (Only in AF3, Boltz only broadcast once)*
 
-$$\begin{aligned} a_i = a_i + L(\text{LN}(s_{M(i)})) \end{aligned}$$
+<br><img src="https://githubusercontent.com"><br>
 
 ## 1.3 Atom Self-Attention
 
@@ -60,7 +60,7 @@ b_{ij} &= \hat{L}_b(bond_{ij}) \end{aligned} 
 \left\{ 
 \begin{aligned} w_{ij} &= \text{Sftm}\left(\frac{q_i \cdot k_j^T}{\sqrt{c}} + b_{ij} + \text{Mask}_{ij}  , \text{dim}=j\right) \\
 
-o_{i} &= \sum_{j \in M^{-1}(I)} w_{ij} v_j \end{aligned} \right. \end{aligned} \\
+o_{i} &= \sum_{j } w_{ij} v_j \end{aligned} \right. \end{aligned} \\
 
 &\Longrightarrow \mathbf{o^h_{i}} = \text{Concat}(o_i^1,\, o_i^2,\, ...,\, o_i^H) \; \in \mathbb{R}^{C} \; \text{for MHA } 
 
@@ -70,7 +70,7 @@ o_{i} &= \sum_{j \in M^{-1}(I)} w_{ij} v_j \end{aligned} \right. \end{aligned} \
 $$
 \begin{aligned} 
 \text{where Mask}_{ij} = \left\{ 
-\begin{aligned} 0 &\qquad \text{if } |\tau (i) - \tau(j)| \leq 2\\ 
+\begin{aligned} 0 &\qquad \text{if } |\tau (i) - \tau(j)| \leq 1\\ 
 -\infty & \qquad \text{otherwise} \end{aligned} \right.
 \end{aligned}
 $$
@@ -82,24 +82,25 @@ $$
 $$
 \begin{aligned} 
 
-\tilde{a}_i &= \text{LN}(a'_i)  \textbf{(Not in AF3/Boltz, but in Transformer)}\\ 
+\tilde{a}_i &= \text{LN}(a'_i) \\ 
 
-\\ &\Longrightarrow a^{(l)}_i = a'_i + L(\text{SiLU}(L(\mathbf{\tilde{a}_i/a'_i)})) \\
+\\ &\Longrightarrow a^{(l)}_i = a'_i + L(\text{SiLU}(L(\mathbf{\tilde{a}_i)})) \\
 
 \end{aligned}
 
 $$
+(Note: Basically, all FFN in AF3 and Boltz use SwiGLU, where <img src="https://githubusercontent.com" valign="middle">)
 
 ## 1.5 Atom/Pair-to-Token Pooling
 
 $$
 \left\{
 \begin{array}{l}
-S_{i} = L\!\left(\text{LN}\!\left( \frac{1}{|A_{i}|} 
-          \sum_{i \in \tau ^{-1}(I)} a_i \right)\right) \\
+S_{i} = L\!\left( \frac{1}{|A_{i}|} 
+          \sum_{i \in \tau ^{-1}(I)} LN(a_i) \right) \\
 
-Z_{ij} = L\!\left(\text{LN}\!\left( \frac{1}{|A_i||A_{j}|} 
-          \sum_{i \in \tau ^{-1}(I)} \sum_{j \in \tau ^{-1}(J)} p_{ij} \right)\right)
+\underset{ \text{not in AF3 and Boltz, due to } O(n^2) \text{, but in RFAA/Hierarchical GNNs etc}}{ \cancel{ Z_{ij} = L\!\left(\text{LN}\!\left( \frac{1}{|A_i||A_{j}|} 
+          \sum_{i \in \tau ^{-1}(I)} \sum_{j \in \tau ^{-1}(J)} p_{ij} \right)\right) } }
 \end{array}
 \right.
 $$
@@ -110,27 +111,27 @@ $$
 ### How does the initial Embeddings/Featurization works?
 
 
-|                | **Categorical Features**<br><br>$\hat{L}(OneHot(x))$/`nn.Embedding`                                                                                                                                                  | **Continuous Features**                                                                                                                                                                                                                           |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Atom Embedding | **• Atom Type: **C, N, O, P<br><br>**• Molecular Type: ** protein, DNA, RNA, Ligand<br><br>**• Cyclic / Modified: ** Ring, Methylation (True/False)<br><br>**• Method Conditioning: ** X-ray, NMR, Cryo-EM (One-hot) | **• Partial Charge : ** (-0.35, 0.1)                                                                                                                                                                                                              |
-| Pair Embedding | **• Bond Type: **single, double, aromatic, no bond (None)<br><br>**• Chain Flag / Relative Chain: ** check if  two nodes are on the same polymer chain<br><br>**• Symmetric Chain：** Homomultimer symmetry           | **• Relative Position (RelPos) : **  just relpos<br><br>  <br><br>**• Contact / Pocket Constraints: ** Distance restrictions between two tokens, or several tokens with a small chain/molecule (Ligand), due to strict scientific methods done ne |
-|                |                                                                                                                                                                                                                      |                                                                                                                                                                                                                                                   |
+|                | **Categorical Features**<br><br><img src="https://githubusercontent.com" valign="middle">/`nn.Embedding`                                                                                                                                                                                                                                                    | **Continuous Features**                                                                                                                                                         |     |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
+| Atom Embedding | **• Atom Type: **C, N, O, P<br><br>**• Molecular Type: ** protein, DNA, RNA, Ligand<br><br>**• Cyclic / Modified: ** Ring, Methylation (True/False)<br><br>**• Method Conditioning: ** X-ray, NMR, Cryo-EM (One-hot)                                                                                                   | **• Partial Charge : ** (-0.35, 0.1)                                                                                                                                            |     |
+| Pair Embedding | **• Bond Type: **single, double, aromatic, no bond (None)<br><br>**• Chain Flag / Relative Chain: ** check if  two nodes are on the same polymer chain<br><br>**• Symmetric Chain：** Homomultimer symmetry<br><br>**• Relative Position (RelPos) : ** It seems to be continuous, but it should be clipped (\[-32, 32]) | **• Contact / Pocket Constraints: ** Distance restrictions between two tokens, or several tokens with a small chain/molecule (Ligand), due to strict scientific methods done ne |     |
+|                |                                                                                                                                                                                                                                                                                                                        |                                                                                                                                                                                 |     |
 
 - For Contact and Pocket Constraints, we will first use one-hot to label the relationship between the target tokens (Binder to Pocket? Pocket to Binder?) as **Categorical Features**. Then, Input the targer range (4-10A), then normalise and embed it with Fourier Embeddings as Continuous Features. 
 
 - If is still don't works, we have another tough tactics as a "Reinsurer": Physics-based Steering during diffusion. When t is approaching 0 but the distance is still far apart, a gradient punishment will pull them together. 
 
 	- For Time-Dependent Contact Potential: 
-$$E_{\text{contact}}(S_A, S_B)(\mathbf{x}) = \frac{\sum_{i \in S_A, j \in S_B} \exp\left(-\lambda_{\text{union}}^t \max(||\mathbf{x}_i - \mathbf{x}_j|| - r_{AB}, 0)\right) \max(||\mathbf{x}_i - \mathbf{x}_j|| - r_{AB}, 0)}{\sum_{i \in S_A, j \in S_B} \exp\left(-\lambda_{\text{union}}^t \max(||\mathbf{x}_i - \mathbf{x}_j|| - r_{AB}, 0)\right)}$$
+<br><img src="https://githubusercontent.com"><br>
 	- For Steric Clash Penalty: 
-$$E_{\text{clash}}(\mathbf{x}) = \frac{1}{N_{\text{pairs}}} \sum_{i,j \text{ (no bond atom pair)}} \max\left( r_{\text{vdw}}^{(i)} + r_{\text{vdw}}^{(j)} - \tau - ||\mathbf{x}_i - \mathbf{x}_j||, 0 \right)^2$$
+<br><img src="https://githubusercontent.com"><br>
 ### Why use Mean Pooling instead of Cross-Attention for Atom-to-Token?
 
--   **Cross-Attention**: Requires computing an $O(N_{token} \times N_{atom})$ attention matrix. For large biomolecular complexes, tracking token-to-atom relationships parametrically introduces severe computational and memory bottlenecks.
+-   **Cross-Attention**: Requires computing an <img src="https://githubusercontent.com" valign="middle"> attention matrix. For large biomolecular complexes, tracking token-to-atom relationships parametrically introduces severe computational and memory bottlenecks.
 
--   **Mean Pooling**: Leverages the deterministic, known mapping $M^{-1}(I)$ between tokens (e.g., amino acids) and their constituent atoms. It efficiently compresses high-resolution local geometry back into the 1D token space ($s_I$) without needing to learn redundant alignment scores.
+-   **Mean Pooling**: Leverages the deterministic, known mapping <img src="https://githubusercontent.com" valign="middle"> between tokens (e.g., amino acids) and their constituent atoms. It efficiently compresses high-resolution local geometry back into the 1D token space (<img src="https://githubusercontent.com" valign="middle">) without needing to learn redundant alignment scores.
 
-### Why use Bond features as an explicit Attention Bias ($b_{ij}$)?
+### Why use Bond features as an explicit Attention Bias (<img src="https://githubusercontent.com" valign="middle">)?
 
 -   **Without Bias**: The attention mechanism would have to implicitly deduce chemical connectivity and spatial constraints entirely from node embeddings.
 
@@ -139,10 +140,9 @@ $$E_{\text{clash}}(\mathbf{x}) = \frac{1}{N_{\text{pairs}}} \sum_{i,j \text{ (no
 
 # 2. Template Module
 
-- **Input**: Template features $T_{raw}^{(0)}$ (Coordinates, Sequence, Alignment Mask $(\text{Mask}_{{ij}})$  up to $K=4$),  $Z_{ij}$
+- **Input**: Template features <img src="https://githubusercontent.com" valign="middle"> (Coordinates, Sequence, Alignment Mask <img src="https://githubusercontent.com" valign="middle">  up to <img src="https://githubusercontent.com" valign="middle">),  <img src="https://githubusercontent.com" valign="middle">
     
-- **Output**: Updated  $Z_{ij}$
-    
+- **Output**: Updated  <img src="https://githubusercontent.com" valign="middle">
 
 ## 2.1 Template Featurization (inculding Missing Embeddings Generation)
 
@@ -153,14 +153,14 @@ $$
 \begin{array}{l}
 \text{Distance: } D^{k}_{ij} = \lVert X^k_{i} -X^k_{j}\rVert_{2}\\
 
-\text{Local Unit Vector: } U^{m}_{ij} = \frac{(R^{m}_{i})^{-1}}{D^m_{{ij}}} \times(X^k_{i} -X^k_{j}) \\ 
+\text{Local Unit Vector: } U^{m}_{ij} = \frac{(R^{m}_{i})^{-1}}{D^m_{{ij}}} (X^k_{j} -X^k_{i}) \\ 
 
 \text{Dihedral Angle + Atomic Feature: } A^m_{i}
 \end{array}
 \right. \\
 \\
 
-\Longrightarrow & T^{(0)'}_{ij} =  l(\text{Onehot}(\text{Concat}(D^{k}_{ij}, U^{m}_{ij}, A^m_{i}, A^m_{j}, \text{Amino Type}_{fasta})))
+\Longrightarrow & T^{(0)'}_{ij} =  l(\text{Onehot}(\text{Concat}(Bin(D^{k}_{ij}, \text{Bins} = N), U^{m}_{ij}, A^m_{i}, A^m_{j}, \text{Amino Type}_{fasta})))
 \end{aligned}
 
 $$
@@ -168,82 +168,94 @@ $$
 
 ## 2.2 Template Pair Stack (x2 Layers)
 
-$$\begin{aligned} T_{ij}^{(k)} = T_{ij}^{(k)} + \text{TriangleAttention}\left(T_{ij}^{(k)}, \, \text{bias}=\text{SeqMask}_{ij}\right) \end{aligned}$$
+<br><img src="https://githubusercontent.com"><br>
 
 ## 2.3 Cross-Template Aggregation
 
-$$\begin{aligned} \tilde{Z}_{ij} = \text{LN}(Z_{ij}), \quad \tilde{T}_{ij}^{(k)} = \text{LN}(T_{ij}^{(k)}) &\Longrightarrow \left\{ \begin{aligned} Q_{ij} &= \hat{L}_q(\tilde{Z}_{ij}) \\ K_{ij}^{(k)} &= \hat{L}_k(\tilde{T}_{ij}^{(k)}) \\ V_{ij}^{(k)} &= \hat{L}_v(\tilde{T}_{ij}^{(k)}) \end{aligned} \right. \\ \\ &\Longrightarrow \begin{aligned} \left\{ \begin{aligned} w_{ij}^{(k)} &= \text{Sftm}\left(\frac{Q_{ij} \cdot K_{ij}^{(k)T}}{\sqrt{c_{head}}} + \text{AlignmentMask}_{ij}^{(k)},\, \text{dim}=k\right) \\ \Delta Z_{ij}^{} &= l( \sum_{k=1}^K w_{IJ}^{(k)} V_{ij}^{(k)}) \end{aligned} \right. \end{aligned} \end{aligned}$$
+<br><img src="https://githubusercontent.com"><br>
 
 ## 2.4 Residual Update to Trunk
 
-$$\begin{aligned} Z_{ij} = Z_{ij} + \Delta Z_{ij} \end{aligned}$$
+<br><img src="https://githubusercontent.com"><br>
 
 ## Questions
 
 ### Where do "Missing Embeddings" come from if there isn't a dedicated lookup table for them?
 
-- **Origin**: They emerge naturally from the `Linear` layer's bias ($\mathbf{b}$) and the amino acid type embedding. When a residue lacks 3D coordinates in the PDB file, its geometric raw features (distances, angles, valid masks) are initialized to arrays of `0`. When this zero-filled vector is multiplied by the weight matrix $W$, it zeros out, leaving only the AA type embedding and the linear bias $\mathbf{b}$. This resulting non-zero high-dimensional vector serves as the distinct "Missing Embedding," signaling to the model: _"I am an Alanine, but my spatial location is unknown."_
+- **Origin**: They emerge naturally from the `Linear` layer's bias (<img src="https://githubusercontent.com" valign="middle">) and the amino acid type embedding. When a residue lacks 3D coordinates in the PDB file, its geometric raw features (distances, angles, valid masks) are initialized to arrays of `0`. When this zero-filled vector is multiplied by the weight matrix <img src="https://githubusercontent.com" valign="middle">, it zeros out, leaving only the AA type embedding and the linear bias <img src="https://githubusercontent.com" valign="middle">. This resulting non-zero high-dimensional vector serves as the distinct "Missing Embedding," signaling to the model: _"I am an Alanine, but my spatial location is unknown."_
     
 
-### Why is the `AlignmentMask` ($\to -\infty$) used in Cross-Aggregation but NOT in the Template Pair Stack?
+### Why is the `AlignmentMask` (<img src="https://githubusercontent.com" valign="middle">) used in Cross-Aggregation but NOT in the Template Pair Stack?
 
 - **Template Pair Stack (Phase 4.2)**: Uses a basic sequence padding mask. The bias is `0` for missing coordinates because the primary goal of this phase is **Imputation**. The missing tokens must be allowed to "see" the resolved surrounding scaffolds to logically deduce and self-correct their own missing geometric features via Triangle Attention.
     
-- **Cross-Aggregation (Phase 4.3)**: Uses the `AlignmentMask`. If a coordinate is missing/imputed, the mask is set to $-10^9$. Because the model is now transferring data back into the main trunk ($Z_{ij}$), it acts as a strict filter. The trunk is only allowed to extract geometric priors from regions backed by actual experimental data, explicitly rejecting the "hallucinated" coordinates generated in Phase 4.2.
+- **Cross-Aggregation (Phase 4.3)**: Uses the `AlignmentMask`. If a coordinate is missing/imputed, the mask is set to <img src="https://githubusercontent.com" valign="middle">. Because the model is now transferring data back into the main trunk (<img src="https://githubusercontent.com" valign="middle">), it acts as a strict filter. The trunk is only allowed to extract geometric priors from regions backed by actual experimental data, explicitly rejecting the "hallucinated" coordinates generated in Phase 4.2.
     
 
 ### What is the difference of Alignment Mask between AF3 and Boltz2 ?
 
-- **AlphaFold 3**: Forces the `AlignmentMask` for all cross-chain regions (off-diagonal) to $0$ (or $-\infty$ in log space), restricting the module to monomeric templates only.
+- **AlphaFold 3**: Forces the `AlignmentMask` for all cross-chain regions (off-diagonal) to <img src="https://githubusercontent.com" valign="middle"> (or <img src="https://githubusercontent.com" valign="middle"> in log space), restricting the module to monomeric templates only.
     
-- **Boltz-2**: Dynamically checks the provenance of the templates. If Chain A and Chain B originate from the exact same PDB ID, Boltz-2 unlocks the cross-chain `AlignmentMask` (sets it to $1$). This allows the templates to be mutually visible to one another across chains, natively unlocking Multimeric Templating capabilities for complex assemblies.
+- **Boltz-2**: Dynamically checks the provenance of the templates. If Chain A and Chain B originate from the exact same PDB ID, Boltz-2 unlocks the cross-chain `AlignmentMask` (sets it to <img src="https://githubusercontent.com" valign="middle">). This allows the templates to be mutually visible to one another across chains, natively unlocking Multimeric Templating capabilities for complex assemblies.
 
-### What is the $R^{-1}$?
+### What is the <img src="https://githubusercontent.com" valign="middle">?
 
-- This is the *Gram-Schmidt process*, which outputs an *Orthogonal Matrix*  representing the amino acid ($N - C_{\alpha}- C$). Therefore, $R^{-1}$ reverse the responding vector from global to local. 
+- This is the *Gram-Schmidt process*, which outputs an *Orthogonal Matrix*  representing the amino acid (<img src="https://githubusercontent.com" valign="middle">). Therefore, <img src="https://githubusercontent.com" valign="middle"> reverse the responding vector from global to local. 
 
 
 # 3. MSA Module
 
-- **Input**: MSA representation $M_{si} \in \mathbb{R}^{N_{\text{seq}} \times N_{\text{token}} \times d_{m}}$,   $Z_{ij}$
+- **Input**: MSA representation <img src="https://githubusercontent.com" valign="middle">,   <img src="https://githubusercontent.com" valign="middle">
     
-- **Output**: Updated  $Z_{ij}$
+- **Output**: Updated  <img src="https://githubusercontent.com" valign="middle">
     
-- **Structure**: 4 identical MSA Blocks $\rightarrow$ 1 Outer Product Mean
+- **Structure**: 4 identical MSA Blocks <img src="https://githubusercontent.com" valign="middle"> 1 Outer Product Mean
     
 
 ## 3.1 MSA Block (x4 Layers)
 
 ### 3.1.1 MSA Row Attention 
 
- $Z_{ij}$ is mapped as Bias, which act as attention bonus
+ <img src="https://githubusercontent.com" valign="middle"> is mapped as Bias, which act as attention bonus
 
-$$\begin{aligned} \tilde{M}_{si} = \text{LN}(M_{si}), \quad \tilde{Z}_{ij} = \text{LN}(Z_{ij}) &\Longrightarrow \left\{ \begin{aligned} q_{si} &= \hat{L}_q(\tilde{M}_{si}) \\ k_{SJ} &= \hat{L}_k(\tilde{M}_{sj}) \\ v_{SJ} &= \hat{L}_v(\tilde{M}_{sj}) \\ b_{IJ} &= \hat{L}_{bias}(\tilde{Z}_{ij}) \end{aligned} \right. \\ \\ &\Longrightarrow \begin{aligned} \left\{ \begin{aligned} w_{sij} &= \text{Sftm}\left(\frac{q_{si} \cdot k_{sj}^T}{\sqrt{c_{head}}} + b_{ij},\, \text{dim}=J\right) \\ o_{si} &= \sum_J w_{sij} v_{sj} \end{aligned} \right. \end{aligned} \\ \\ &\Longrightarrow m_{si} = m_{si} + L(o_{si}) \end{aligned}$$
+<br><img src="https://githubusercontent.com"><br>
 
-### 3.1.2 MSA Column Attention (covariance)
+### 3.1.2 ~~MSA Column Attention (Only in AF12, not in Boltz and AF3, covariance)~~
 
- $S$ and $T$ exchange information, so no pair bias
+ <img src="https://githubusercontent.com" valign="middle"> and <img src="https://githubusercontent.com" valign="middle"> exchange information, so no pair bias
 
-$$\begin{aligned} \tilde{M}_{si} = \text{LN}(M_{si}) &\Longrightarrow \left\{ \begin{aligned} q_{si} &= \hat{L}_q(\tilde{M}_{si}) \\ k_{ti} &= \hat{L}_k(\tilde{m}_{TI}) \\ v_{ti} &= \hat{L}_v(\tilde{M}_{ti}) \end{aligned} \right. \\ \\ &\Longrightarrow \begin{aligned} \left\{ \begin{aligned} w_{sti} &= \text{Sftm}\left(\frac{q_{si} \cdot k_{ti}^T}{\sqrt{c_{head}}},\, \text{dim}=T\right) \\ o_{si} &= \sum_T w_{sti} v_{ti} \end{aligned} \right. \end{aligned} \\ \\ &\Longrightarrow m_{si} = m_{si} + L(o_{si}) \end{aligned}$$
+<br><img src="https://githubusercontent.com"><br>
 
 ### 3.1.3 MSA Transition (FFN)
 
-$$\begin{aligned} \tilde{M}_{si} &= \text{LN}(M_{si}) \\ \\ &\Longrightarrow M_{si} = M_{si} + L_{out}\left(\text{SiLU}(L_{in}(\tilde{M}_{si}))\right) \end{aligned}$$
+<br><img src="https://githubusercontent.com"><br>
 
-(Note: if use SwiGLU, it will become $L_{out}(\text{SiLU}(L_{in1}(\tilde{m}_{SI})) \odot L_{in2}(\tilde{m}_{SI}))$)
+(Note: Basically, all FFN in AF3 and Boltz use SwiGLU, where <img src="https://githubusercontent.com" valign="middle">)
 
 ## 3.2 Outer Product Mean (OPM)
 
-Turning the $2D$ sequence feature ($N_{seq} \times N_{token}$ to  $2D$ token pair feature ($N_{token} \times N_{token}$), and send it back the the main trunk
+Turning the <img src="https://githubusercontent.com" valign="middle"> sequence feature (<img src="https://githubusercontent.com" valign="middle"> to  <img src="https://githubusercontent.com" valign="middle"> token pair feature (<img src="https://githubusercontent.com" valign="middle">), and send it back the the main trunk
 
-$$\begin{aligned} \tilde{M}_{si} = \text{LN}(M_{si}) &\Longrightarrow \left\{ \begin{aligned} \text{left}_{si} &= \hat{L}_{left}(\tilde{M}_{si}) \\ \text{right}_{sj} &= \hat{L}_{right}(\tilde{M}_{sj}) \end{aligned} \right. \\ \\ &\Longrightarrow \text{opm}_{ij} = \text{Flatten}\left( \frac{1}{N_{seq}} \sum_{S=1}^{N_{seq}} \left( \text{left}_{si} \otimes \text{right}_{sj} \right) \right) \\ \\ &\Longrightarrow Z_{ij} = Z_{ij} + L_{out}(\text{opm}_{ij}) \end{aligned}$$
-
-# 4. PairFormer Block (x64 Layers)
+<br><img src="https://githubusercontent.com"><br>
 
 
--   **Input**: $z_{ij}$
+## Questions
 
--   **Output**: Updated $z_{ij}$
+### Why there is no Column Attention in MSA, but in PairFormer?
+
+- In Pair Former, the tensor updated is <img src="https://githubusercontent.com" valign="middle">, which is symmetric, so it is essential to ensure it is an undirected graph. 
+- In MSA, the tensor updated is <img src="https://githubusercontent.com" valign="middle">, where it is column attention is doing on different on sequence. Not to mention the fact that different species have different length so different properties and functions on the corresponding token, MSA module do not have ligands, ions, and non-classic nucleic acid evolution data, so the computing resources will focus on the deoising module. 
+
+### Why no divide by N_seq in opm?
+
+- You cannot divide the opm by the total tensor size (<img src="https://githubusercontent.com" valign="middle">) because it includes padding zeros, which severely dilutes valid evolutionary signals and causes vanishing gradients. You must divide only by the count of _valid_ sequences (using a mask) to compute the true, mathematically accurate mean.
+
+
+# 4. PairFormer Block (x48 Layers)
+
+-   **Input**: <img src="https://githubusercontent.com" valign="middle">
+
+-   **Output**: Updated <img src="https://githubusercontent.com" valign="middle">
 
 ## 4.1 Triangle Multiplicative Update (Outgoing)
 
@@ -273,7 +285,7 @@ g_{ij} &= \sigma(L(\tilde{z}_{ij}))
 
 \\
 
-&\Longrightarrow x_{ij} = \sum_k L_{ik} \odot R_{kj} \\
+&\Longrightarrow x_{ij} = \sum_k L_{ik} \odot R_{jk} \\
 
 \\
 
@@ -301,11 +313,11 @@ $$
 
 q_{ij} &= \hat{L}(\tilde{z}_{ij}) \\
 
-k_{ij} &= \hat{L}(\tilde{z}_{ij}) \\
+k_{ik} &= \hat{L}(\tilde{z}_{ik}) \\
 
-v_{ij} &= \hat{L}(\tilde{z}_{ij}) \\
+v_{ik} &= \hat{L}(\tilde{z}_{ik}) \\
 
-b_{ij} &= \hat{L}(\tilde{z}_{ij}) \\
+b_{jk} &= \hat{L}(\tilde{z}_{jk}) \\
 
 g_{ij} &= \text{Sig}(L(\tilde{z}_{ij}))
 
@@ -343,13 +355,13 @@ $$
 
 ## 4.3 Incoming TriMul and Ending TriAtt
 
-**Note:** In practice (e.g., Boltz codebase), the Incoming and Ending operations are not implemented as separate modules. Due to the geometric symmetry of the pair representation $Z_{ij}$, reversing the edge direction ($j \to i$) is mathematically equivalent to transposing the pair matrix.
+**Note:** In practice (e.g., Boltz codebase), the Incoming and Ending operations are not implemented as separate modules. Due to the geometric symmetry of the pair representation <img src="https://githubusercontent.com" valign="middle">, reversing the edge direction (<img src="https://githubusercontent.com" valign="middle">) is mathematically equivalent to transposing the pair matrix.
 
 Instead of redundant formulas, the network achieves **Incoming** and **Ending Node** updates by applying the exact same **Outgoing / Starting** modules to the transposed pair tensor, and then transposing the result back:
 
-$$\begin{aligned} \text{TriMul}_{\text{incoming}}(Z) &= \left( \text{TriMul}_{\text{outgoing}}(Z^T) \right)^T \\ \\ \text{TriAtt}_{\text{ending}}(Z) &= \left( \text{TriAtt}_{\text{starting}}(Z^T) \right)^T \end{aligned}$$
+<br><img src="https://githubusercontent.com"><br>
 
-## 4.3 Pair Transition
+## 4.4 Pair Transition
 
 $$
 
@@ -373,23 +385,21 @@ $$
 
 -   **Pre-LN**: Applies LayerNorm to the branch inputs instead, preserving a clean addition-based residual highway. This ensures backward gradients flow smoothly while maintaining stability in forward computations.
 
-### What is $\mathbf{b_{ij}}$ ?
+### What is <img src="https://githubusercontent.com" valign="middle"> ?
 
-- $\mathbf{b_{ij}}$ is a scalar, which represents the 3rd edge bias (for Multi-head attention, each head will have their responding $b_{ij}$). If $jk$ is really far away, $b_{ij} \to - \infty$, so $w_{ijk} \to 0$
+- <img src="https://githubusercontent.com" valign="middle"> is a scalar, which represents the 3rd edge bias (for Multi-head attention, each head will have their responding <img src="https://githubusercontent.com" valign="middle">). If <img src="https://githubusercontent.com" valign="middle"> is really far away, <img src="https://githubusercontent.com" valign="middle">, so <img src="https://githubusercontent.com" valign="middle">
 
 ### Why do we need both Outgoing/Starting and Incoming/Ending split in Triangle blocks?
 
-- In 3D space, the pair matrix must be symmetric ($d_{{ij}} = d_{ji}$). If we only rely on outgoing ($i \to k \to j$), it will lead to a **Directed Graph**. This destroy the apriority of symmetry. Therefore, this ensure the features are spreaded in **Undirected Graph**. 
+- In 3D space, the pair matrix must be symmetric (<img src="https://githubusercontent.com" valign="middle">). If we only rely on outgoing (<img src="https://githubusercontent.com" valign="middle">), it will lead to a **Directed Graph**. This destroy the apriority of symmetry. Therefore, this ensure the features are spreaded in **Undirected Graph**. 
   
 - By instinct, the Starting Node is doing attention on **ROW**, where the ending node is doing attention on **COLUMN**. Note that the heads have different weights. 
 
-Here is the complete, hardcore markdown note with absolutely all the details, translated into English and formatted exactly like your previous notes.
-
 # 5. Denoising Module (Atom Transformer Block)
 
-**Input:** Noisy atom coordinates $\mathbf{X}_t$, Timestep $t$, Static pair feature $z_{ij}$, Single token $s_i$.
+**Input:** Noisy atom coordinates <img src="https://githubusercontent.com" valign="middle">, Timestep <img src="https://githubusercontent.com" valign="middle">, Static pair feature <img src="https://githubusercontent.com" valign="middle">, Single token <img src="https://githubusercontent.com" valign="middle">.
 
-**Output:** Updated atom features $a_{ia}$, Predicted denoised coordinates $\hat{\mathbf{X}}_0$.
+**Output:** Updated atom features <img src="https://githubusercontent.com" valign="middle">, Predicted denoised coordinates <img src="https://githubusercontent.com" valign="middle">.
 
 ## 5.0 Geometric Pre-processing & Feature Fusion
 
@@ -400,82 +410,76 @@ Before any attention mechanism, the network must guarantee SE(3) invariance and 
 $$
 \begin{aligned}
 &\text{(1) Center of Mass (CoM) Alignment (Zero-mean centering)} \\
-&\quad \mathbf{X}_{\text{CoM}} = \frac{1}{N} \sum_{i=1}^N \mathbf{X}_{t}^{(i)} \\
-&\quad \Longrightarrow \mathbf{X}_t \leftarrow \mathbf{X}_t - \mathbf{X}_{\text{CoM}} \\
+&\quad \mathbf{X}_{\text{CoM}} = \frac{\sum_{i=1}^N \mathbf{X}_{t}^{(i)} \cdot \mathbf{\text{Mask}_{\text{valid}}^{(i)}}}{\sum_{i=1}^N \mathbf{\text{Mask}_{\text{valid}}^{(i)}}} \\
+&\quad \Longrightarrow \mathbf{X}_t \leftarrow \mathbf{X}_t - \mathbf{X}_{\text{CoM}} \\ \\
 
 &\text{(2) Noisy Distance and RBF Positional Encoding} \\
 &\quad d_{ij} = \| \mathbf{X}_t^{(i)} - \mathbf{X}_t^{(j)} \|_2 \\
 &\quad \Longrightarrow \mathbf{E}_{\text{RBF}} = \exp \left( - \frac{(d_{ij} - c_k)^2}{2\sigma_k^2} \right) \quad 
- k \in \{1, 2, \dots, K\} \\
+ k \in \{1, 2, \dots, K\} \\ \\
 
 &\text{(3) The Grand Feature Fusion} \\
 &\quad a_{ia}^{(0)} = L(s_i) + \text{AtomTypeEmb}(a) 
 \quad \text{(Initialize atom tokens)} \\
-&\quad \tilde{z}_{ij} = z_{ij} + L(\mathbf{E}_{\text{RBF}}) 
+&\quad \tilde{z}_{ia, jb} = z_{\tau(ia), \tau(jb)} + L(\mathbf{E}_{\text{RBF}}(d_{ia, jb})) 
 \quad \text{(Fuse static prior with noisy dynamic geometry)}
 \end{aligned}
 $$
 
 ## 5.1 Timestep Embedding & AdaLN (Adaptive Layer Normalization)
 
-Injecting the timestep $t$ dynamically to scale and shift features.
+Injecting the timestep <img src="https://githubusercontent.com" valign="middle"> dynamically to scale and shift features.
 
-$$\begin{aligned} c_t &= \text{MLP}(\text{SinusoidalPosEmb}(t)) \\ \\ &\Longrightarrow \left\{ \begin{aligned} \gamma_t &= L_\gamma(c_t) \\ \beta_t &= L_\beta(c_t) \end{aligned} \right. \\ \\ &\Longrightarrow \tilde{a}_{ia} = \text{LN}(a_{ia}) \odot (1 + \gamma_t) + \beta_t \end{aligned}$$
+<br><img src="https://githubusercontent.com"><br>
 
 ## 5.2 Conditioned Atom Attention
 
-Atoms attend to other atoms, strictly guided by the fused pair/distance representation $\tilde{z}_{ij}$ as an attention bias.
+Atoms attend to other atoms, strictly guided by the fused pair/distance representation <img src="https://githubusercontent.com" valign="middle"> as an attention bias.
 
-$$\begin{aligned} &\left\{ \begin{aligned} q_{ia} &= L_q(\tilde{a}_{ia}) \\ k_{jb} &= L_k(\tilde{a}_{jb}) \\ v_{jb} &= L_v(\tilde{a}_{jb}) \\ b_{ij} &= L_b(\tilde{z}_{ij}) \quad  \end{aligned} \right. \\ \\ \Longrightarrow & w_{ia, jb} = \text{Sftm}\left(\frac{q_{ia} \cdot k_{jb}^T}{\sqrt{c}} + b_{ij},\, \text{dim}=(j,b)\right) \\ \\ \Longrightarrow & o_{ia} = \sum_{j,b} w_{ia, jb} v_{jb} \\ \\ \Longrightarrow & a_{ia} = a_{ia} + L_{\text{out}}(o_{ia}) \end{aligned}$$
+<br><img src="https://githubusercontent.com"><br>
 
 ## 5.3 Atom Transition & Coordinate Update
 
 Updating atom features and projecting them into actual 3D displacement vectors.
 
-$$\begin{aligned} a_{ia} &= a_{ia} + \text{MLP}(\text{AdaLN}(a_{ia}, c_t)) \\ \\ &\Longrightarrow \Delta \mathbf{X}_{ia} = L(\text{SiLU}(L_{\text{hidden}}(a_{ia}))) \\ \\ &\Longrightarrow \hat{\mathbf{X}}_0 = \mathbf{X}_t + \Delta \mathbf{X}_{ia} - \text{CoM}(\Delta \mathbf{X}_{ia}) \quad \text{(Predicting clean coordinates, re-centered)} \end{aligned}$$
+<br><img src="https://githubusercontent.com"><br>
 
 ## Questions
 
 ### **Why CoM (Center of Mass) Alignment?**
 
-To strictly preserve translational invariance. If we don't zero-mean the coordinates, the network might waste capacity learning meaningless global translations. Every update ($\Delta \mathbf{X}$) must also be re-centered so the molecule doesn't artificially drift through space during the diffusion process.
+To strictly preserve translational invariance. If we don't zero-mean the coordinates, the network might waste capacity learning meaningless global translations. Every update (<img src="https://githubusercontent.com" valign="middle">) must also be re-centered so the molecule doesn't artificially drift through space during the diffusion process.
 
 ### **Why use RBF Positional Encoding instead of Absolute Coordinates?**
 
-Absolute coordinates ($\mathbf{X}_t$) destroy SE(3) invariance (rotational and translational invariance). By converting coordinates into pairwise distances $d_{ij}$, we achieve invariance. However, a single scalar distance is too weak for neural networks. RBF (Radial Basis Function) artificially expands this 1D distance into a smooth, high-dimensional continuous vector space, allowing the network to have smooth gradients as atoms move closer or further apart.
+Absolute coordinates (<img src="https://githubusercontent.com" valign="middle">) destroy SE(3) invariance (rotational and translational invariance). By converting coordinates into pairwise distances <img src="https://githubusercontent.com" valign="middle">, we achieve invariance. However, a single scalar distance is too weak for neural networks. RBF (Radial Basis Function) artificially expands this 1D distance into a smooth, high-dimensional continuous vector space, allowing the network to have smooth gradients as atoms move closer or further apart.
 
-### **Why AdaLN instead of Concatenation for Timestep $t$?**
+### **Why AdaLN instead of Concatenation for Timestep <img src="https://githubusercontent.com" valign="middle">?**
 
-- **Concatenation:** Forcing $t$ onto the feature dimension requires the network to constantly learn how to extract it, causing signal decay in deep layers.
+- **Concatenation:** Forcing <img src="https://githubusercontent.com" valign="middle"> onto the feature dimension requires the network to constantly learn how to extract it, causing signal decay in deep layers.
     
-- **AdaLN:** By using $\gamma_t$ (scale) and $\beta_t$ (shift), $t$ directly modulates the entire activation distribution. When $t$ is large (high noise), AdaLN shifts the network to focus on global structural features; when $t$ is small (low noise), it shifts to refining local chemical bonds. Setting initial weights of $L_\gamma, L_\beta$ to zero ensures stable identity mapping early in training.
+- **AdaLN:** By using <img src="https://githubusercontent.com" valign="middle"> (scale) and <img src="https://githubusercontent.com" valign="middle"> (shift), <img src="https://githubusercontent.com" valign="middle"> directly modulates the entire activation distribution. When <img src="https://githubusercontent.com" valign="middle"> is large (high noise), AdaLN shifts the network to focus on global structural features; when <img src="https://githubusercontent.com" valign="middle"> is small (low noise), it shifts to refining local chemical bonds. Setting initial weights of <img src="https://githubusercontent.com" valign="middle"> to zero ensures stable identity mapping early in training.
     
 
-### **Why condition $z_{ij}$ with RBF to get $\tilde{z}_{ij}$? (The core logic of Diffusion)**
+### **Why condition <img src="https://githubusercontent.com" valign="middle"> with RBF to get <img src="https://githubusercontent.com" valign="middle">? (The core logic of Diffusion)**
 
-This is where the magic happens. $z_{ij}$ represents the _perfect static prior_ (where atoms _should_ be). The RBF encoding represents the _current noisy geometry_ (where atoms _currently_ are). By fusing them ($\tilde{z}_{ij} = z_{ij} + \text{RBF}$), the attention bias ($b_{ij}$) inherently calculates the geometric tension between the "ideal state" and the "current broken state". This tension is the exact mathematical driving force that tells the network how to predict $\Delta \mathbf{X}$.
+This is where the magic happens. <img src="https://githubusercontent.com" valign="middle"> represents the _perfect static prior_ (where atoms _should_ be). The RBF encoding represents the _current noisy geometry_ (where atoms _currently_ are). By fusing them (<img src="https://githubusercontent.com" valign="middle">), the attention bias (<img src="https://githubusercontent.com" valign="middle">) inherently calculates the geometric tension between the "ideal state" and the "current broken state". This tension is the exact mathematical driving force that tells the network how to predict <img src="https://githubusercontent.com" valign="middle">.
 
-### **Why predict denoised coordinates $\hat{\mathbf{X}}_0$ instead of predicting noise $\epsilon$?**
+### **Why predict denoised coordinates <img src="https://githubusercontent.com" valign="middle"> instead of predicting noise <img src="https://githubusercontent.com" valign="middle">?**
 
-Standard image DDPMs predict noise $\epsilon$. But in 3D molecules, predicting a raw noise matrix doesn't allow us to calculate physical constraints. By directly predicting the absolute denoised structure $\hat{\mathbf{X}}_0$, we can feed this output directly into FAPE (Frame Aligned Point Error) to calculate a physically meaningful loss based on steric clashes, bond lengths, and absolute chiralities.
-
-There we go—every single detail mathematically mapped and perfectly aligned with the architectural logic.
-
-Are we moving on to the final boss of the architecture: **How FAPE Loss calculates spatial error using local frames (SE(3) math)**, or do you want to transition into **how the ODE/SDE sampling loop actually steps backward from $T \to 0$ to generate the final `.pdb`?**
-
-  
+Standard image DDPMs predict noise <img src="https://githubusercontent.com" valign="middle">. But in 3D molecules, predicting a raw noise matrix doesn't allow us to calculate physical constraints. By directly predicting the absolute denoised structure <img src="https://githubusercontent.com" valign="middle">, we can feed this output directly into FAPE (Frame Aligned Point Error) to calculate a physically meaningful loss based on steric clashes, bond lengths, and absolute chiralities.
 
 # 6. Inference-Time Steering (Boltz-Steering )
 
-**Input:** $\mathbf{X}_t$, $t$ 
+**Input:** <img src="https://githubusercontent.com" valign="middle">, <img src="https://githubusercontent.com" valign="middle"> 
 
-**Output:** $\mathbf{X}_{t-1}$ 
+**Output:** <img src="https://githubusercontent.com" valign="middle"> 
 
 ## 6.1 Time-Dependent Clash Energy
 
 $$
 \begin{aligned}
-&c_{ij} = r_{\text{vdw}}^{(i)} + r_{\text{vdw}}^{(j)} - \tau \\ &E_{\text{clash}}(\hat{\mathbf{X}}_0) = \sum_{i<j, \, \text{non-bonded}} \max \left(0, \, c_{ij} - \| \hat{\mathbf{X}}_0^{(i)} - \hat{\mathbf{X}}_0^{(j)} \|_2 \right)^2 \\
+&c_{ij} = r_{\text{vdw}}^{(i)} + r_{\text{vdw}}^{(j)} - \tau \\ &E_{\text{clash}}(\hat{\mathbf{X}}_0) = \sum_{i<j, \, \text{topological distance } >3} \max \left(0, \, c_{ij} - \| \hat{\mathbf{X}}_0^{(i)} - \hat{\mathbf{X}}_0^{(j)} \|_2 \right)^2 \\
 \end{aligned}
 $$
 
@@ -500,12 +504,16 @@ $$
 
 ## Questions
 
-**How does the Steric Clash Penalty "push" atoms apart during Denoising?**
+### **How does the Steric Clash Penalty "push" atoms apart during Denoising?**
 
-- During each denoising step, the system feeds $\hat{\mathbf{X}}_0$ into the clash energy function $E_{\text{clash}}$. If atoms overlap, $E_{\text{clash}}$ rises sharply. The system then computes partial derivatives $\nabla_{\hat{\mathbf{X}}_0}$, which yield a 3D repulsive force vector in real space. Before moving to $t−1$, the model applies this force through gradient descent, pulling apart atoms that collide. This mechanism—called **BoltzSteering**—is the core safeguard that ensures the generated structure remains physically reasonable.
+- During each denoising step, the system feeds <img src="https://githubusercontent.com" valign="middle"> into the clash energy function <img src="https://githubusercontent.com" valign="middle">. If atoms overlap, <img src="https://githubusercontent.com" valign="middle"> rises sharply. The system then computes partial derivatives <img src="https://githubusercontent.com" valign="middle">, which yield a 3D repulsive force vector in real space. Before moving to <img src="https://githubusercontent.com" valign="middle">, the model applies this force through gradient descent, pulling apart atoms that collide. This mechanism—called **BoltzSteering**—is the core safeguard that ensures the generated structure remains physically reasonable.
 
-**How does the Time-Dependent Contact Potential ($\lambda(t)$) control this?**
+### **How does the Time-Dependent Contact Potential (<img src="https://githubusercontent.com" valign="middle">) control this?**
 
-- **High noise (Large $t$)：** $\lambda(t) \approx 0$. Allow them to overlap, so the model will focus on the macro structure
+- **High noise (Large <img src="https://githubusercontent.com" valign="middle">)：** <img src="https://githubusercontent.com" valign="middle">. Allow them to overlap, so the model will focus on the macro structure
     
-- **Low noise（$t \to 0$）：** $\lambda(t)$ rockets. Focus on the micro details will be observed
+- **Low noise（<img src="https://githubusercontent.com" valign="middle">）：** <img src="https://githubusercontent.com" valign="middle"> rockets. Focus on the micro details will be observed
+
+### Why not `no bond atom pair` in Steric Clash?
+
+- For real molecules, 1-3 for bond angle and 1-4 for dihedral angles might be smaller than the sum of Van de Vaal radii, so we should consider these scenario. 
